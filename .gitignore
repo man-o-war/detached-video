@@ -1,0 +1,12 @@
+.DS_Store
+Thumbs.db
+node_modules/
+.wxt/
+.output/
+dist/
+coverage/
+web-ext-artifacts/
+*.log
+.env
+.env.*
+!.env.example

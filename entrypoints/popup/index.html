@@ -1,0 +1,26 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Detached</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Detached</h1>
+      <p id="status" role="status">Looking for media…</p>
+      <form hidden>
+        <label for="media">Media on this tab</label>
+        <select id="media" required></select>
+        <button type="submit">Open mini player</button>
+      </form>
+      <div class="actions">
+        <button id="embed" type="button" hidden>Open embedded player in a tab</button>
+        <button id="refresh" type="button" hidden>Scan again</button>
+      </div>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
