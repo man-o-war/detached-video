@@ -20,8 +20,9 @@ export interface MediaScan {
 export interface OpenResult {
   status: 'opened' | 'gesture' | 'error';
   message?: string;
+  reason?: 'site-opt-out';
 }
 
 export type PlayerRequest =
   | { detached: 'scan' }
-  | { detached: 'open'; mediaId: number; view: PlayerView };
+  | { detached: 'open'; mediaId: number; view: PlayerView; overrideSiteOptOut?: boolean };

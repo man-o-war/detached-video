@@ -26,8 +26,10 @@ element. Include at least one page with multiple media elements.
    skips, and automatic advancement. Navigate to a standalone video and verify
    the playlist controls and preview disappear. Verify changing display modes
    never advances the playlist.
-7. On a video that opts out of Picture-in-Picture, verify each view respects
-   the opt-out and explains why the player cannot open.
+7. On a video that opts out of Picture-in-Picture, verify all three views
+   require **Open anyway once**. Close the player and confirm the video
+   opts out again. Confirm a browser or document policy denial offers no
+   override.
 
 Include the browser version, operating system, source type, and any variations
 when reporting results. See the [roadmap](docs/ROADMAP.md) for target sites.

@@ -27,7 +27,7 @@ export function mountFloatingPlayer(
   initialView: ControlsView,
   actions: {
     videoBlocked(candidate: MediaCandidate): boolean;
-    showVideo(candidate: MediaCandidate): Promise<OpenResult>;
+    showVideo(candidate: MediaCandidate, overrideSiteOptOut?: boolean): Promise<OpenResult>;
     onClose(): void;
   },
 ): FloatingPlayer {
@@ -71,6 +71,8 @@ export function mountFloatingPlayer(
   const next = addButton(transport, 'Next');
   const viewButton = addButton(footer, 'Compact view');
   const videoButton = addButton(footer, 'Show video');
+  const overrideVideo = addButton(footer, 'Open anyway once');
+  overrideVideo.hidden = true;
 
   const seekRow = doc.createElement('div');
   seekRow.className = 'seek-row';
@@ -181,6 +183,7 @@ export function mountFloatingPlayer(
     mediaEvents.abort();
     mediaEvents = new AbortController();
     player.candidate = candidate;
+    overrideVideo.hidden = true;
     setStatus(candidate ? '' : 'Select the current media from the Detached toolbar.');
     if (candidate?.source === 'html') {
       for (const name of ['play', 'pause', 'ended', 'timeupdate', 'volumechange', 'durationchange', 'progress', 'emptied']) {
@@ -251,14 +254,25 @@ export function mountFloatingPlayer(
     renderDetails();
   });
   viewButton.addEventListener('click', () => player.setView(player.view === 'artwork' ? 'compact' : 'artwork'));
-  videoButton.addEventListener('click', async () => {
+  async function showVideo(overrideSiteOptOut: boolean) {
     if (!player.candidate || switching) return;
+    overrideVideo.hidden = true;
     switching = videoButton.disabled = true;
-    const result = await actions.showVideo(player.candidate);
-    if (result.status !== 'opened') {
-      setStatus(result.message ?? 'Use the Detached button in the source tab to show video.');
+    const candidate = player.candidate;
+    try {
+      const result = await actions.showVideo(candidate, overrideSiteOptOut);
+      if (result.status !== 'opened' && player.candidate === candidate) {
+        setStatus(result.message ?? 'Use the Detached button in the source tab to show video.');
+        overrideVideo.hidden = result.reason !== 'site-opt-out';
+        if (!overrideVideo.hidden) overrideVideo.focus();
+      }
+    } finally {
+      switching = videoButton.disabled = false;
     }
-    switching = videoButton.disabled = false;
+  }
+  videoButton.addEventListener('click', () => void showVideo(false));
+  overrideVideo.addEventListener('click', () => {
+    if (!overrideVideo.hidden) void showVideo(true);
   });
 
   function skip(direction: 'previousButton' | 'nextButton') {

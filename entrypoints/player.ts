@@ -11,13 +11,45 @@ function videoInPiP(element: HTMLElement) {
   return element.tagName === 'VIDEO' && root.pictureInPictureElement === element;
 }
 
-function blockedMessage({ element }: MediaCandidate) {
-  if (element.tagName === 'VIDEO' &&
-      ((element as HTMLVideoElement).disablePictureInPicture || element.hasAttribute('disablepictureinpicture'))) {
-    return 'This site disabled Picture-in-Picture for the selected video.';
-  }
+const optOutAttribute = 'disablepictureinpicture';
+
+function siteOptedOut(element: HTMLElement) {
+  return element.tagName === 'VIDEO' && element.hasAttribute(optOutAttribute);
+}
+
+function checkPiP({ element }: MediaCandidate, overrideSiteOptOut: boolean): OpenResult | undefined {
   if (element.ownerDocument.pictureInPictureEnabled === false || document.pictureInPictureEnabled === false) {
-    return 'Chrome or this page’s permissions policy disables Picture-in-Picture.';
+    return { status: 'error', message: 'Chrome or this page’s permissions policy disables Picture-in-Picture.' };
+  }
+  if (!overrideSiteOptOut && siteOptedOut(element)) {
+    return {
+      status: 'error',
+      reason: 'site-opt-out',
+      message: 'This site disabled Picture-in-Picture for the selected video.',
+    };
+  }
+}
+
+async function requestVideo(video: HTMLVideoElement, overrideSiteOptOut: boolean) {
+  const optOut = overrideSiteOptOut ? video.getAttribute(optOutAttribute) : null;
+  if (optOut === null) {
+    await video.requestPictureInPicture();
+    return;
+  }
+  const sourceWindow = video.ownerDocument.defaultView;
+  const restore = () => {
+    video.removeEventListener('leavepictureinpicture', restore);
+    sourceWindow?.removeEventListener('pagehide', restore);
+    if (!siteOptedOut(video)) video.setAttribute(optOutAttribute, optOut);
+  };
+  video.addEventListener('leavepictureinpicture', restore);
+  sourceWindow?.addEventListener('pagehide', restore);
+  video.removeAttribute(optOutAttribute);
+  try {
+    await video.requestPictureInPicture();
+  } catch (error) {
+    restore();
+    throw error;
   }
 }
 
@@ -32,6 +64,7 @@ export default defineUnlistedScript(() => {
   let choices = new Map<number, MediaCandidate>();
   let removeButton: (() => void) | undefined;
   let controls: FloatingPlayer | undefined;
+  let controlsOverride: HTMLElement | undefined;
   let opening = false;
 
   function scan(): MediaScan {
@@ -54,12 +87,14 @@ export default defineUnlistedScript(() => {
     };
   }
 
-  function prompt(getCandidate: () => MediaCandidate | undefined, view: PlayerView) {
+  function prompt(getCandidate: () => MediaCandidate | undefined, view: PlayerView, overrideSiteOptOut = false) {
     removeButton?.();
     removeButton = showPageButton(async () => {
       const candidate = getCandidate();
       if (!candidate) return 'Select the current media from the Detached toolbar.';
-      const result = await open(candidate, view, true);
+      const override = overrideSiteOptOut;
+      overrideSiteOptOut = false;
+      const result = await open(candidate, view, { fromPage: true, overrideSiteOptOut: override });
       return result.status === 'opened' ? undefined : result.message;
     });
   }
@@ -89,14 +124,19 @@ export default defineUnlistedScript(() => {
     video.addEventListener('leavepictureinpicture', onLeave, { once: true });
   }
 
-  async function open(candidate: MediaCandidate, view: PlayerView, fromPage = false): Promise<OpenResult> {
+  async function open(
+    candidate: MediaCandidate,
+    view: PlayerView,
+    { fromPage = false, overrideSiteOptOut = false } = {},
+  ): Promise<OpenResult> {
     const { element, kind } = candidate;
     const doc = element.ownerDocument;
 
     if (!isCandidatePlayable(candidate)) return { status: 'error', message: 'This media changed. Scan again to select it.' };
     if (opening) return { status: 'error', message: 'A mini player is already opening.' };
-    const blocked = blockedMessage(candidate);
-    if (blocked) return { status: 'error', message: blocked };
+    const reusingControls = view !== 'video' && controls?.candidate?.element === element && !controls.window.closed;
+    const blocked = checkPiP(candidate, overrideSiteOptOut || (reusingControls && controlsOverride === element));
+    if (blocked) return blocked;
 
     opening = true;
     try {
@@ -108,7 +148,7 @@ export default defineUnlistedScript(() => {
           return { status: 'error', message: 'Native Picture-in-Picture is unavailable for this media.' };
         }
         if (!videoInPiP(video)) {
-          await video.requestPictureInPicture();
+          await requestVideo(video, overrideSiteOptOut);
           controls?.window.close();
           watchVideo(video, doc);
         }
@@ -122,13 +162,19 @@ export default defineUnlistedScript(() => {
         const hasArtwork = view === 'artwork' && !!playerDetails(candidate).artwork;
         const pip = await host.requestWindow({ width: 360, height: hasArtwork ? 222 : 168 });
         try {
-          controls = mountFloatingPlayer(pip, candidate, view, {
-            videoBlocked: media => !!blockedMessage(media),
-            showVideo: media => open(media, 'video'),
+          const approvedElement = overrideSiteOptOut && siteOptedOut(element) ? element : undefined;
+          const player = mountFloatingPlayer(pip, candidate, view, {
+            videoBlocked: media => !!checkPiP(media, approvedElement === media.element),
+            showVideo: (media, override) => open(media, 'video', { overrideSiteOptOut: override }),
             onClose: () => {
-              if (controls?.window === pip) controls = undefined;
+              if (controls?.window === pip) {
+                controls = undefined;
+                controlsOverride = undefined;
+              }
             },
           });
+          controls = player;
+          controlsOverride = approvedElement;
         } catch (error) {
           pip.close();
           throw error;
@@ -140,7 +186,7 @@ export default defineUnlistedScript(() => {
     } catch (error) {
       const name = (error as { name?: string })?.name;
       if (!fromPage && name === 'NotAllowedError') {
-        prompt(() => candidate, view);
+        prompt(() => candidate, view, overrideSiteOptOut);
         return { status: 'gesture' };
       }
       if (name === 'SecurityError') {
@@ -163,7 +209,9 @@ export default defineUnlistedScript(() => {
         respond({ status: 'error', message: 'Scan again to select the current media.' } satisfies OpenResult);
         return;
       }
-      void open(candidate, request.view ?? defaultView(candidate.kind)).then(respond, () => {
+      void open(candidate, request.view ?? defaultView(candidate.kind), {
+        overrideSiteOptOut: request.overrideSiteOptOut === true,
+      }).then(respond, () => {
         respond({ status: 'error', message: 'Could not open the mini player.' });
       });
       return true;

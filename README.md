@@ -32,6 +32,10 @@ to switch out of Video view, or **Show video** from the floating controls to
 switch back. The site continues streaming in every view, subject to its browser
 and playback policies.
 
+When a video asks Chrome to disable Picture-in-Picture, Detached offers
+**Open anyway once** after you try to open it. That choice applies to the
+selected video for the current floating session.
+
 On desktop YouTube watch pages with an active playlist, the toolbar shows
 **Up next** when YouTube exposes the next track. The floating controls can
 use YouTube's Previous and Next actions and follow automatic track changes.

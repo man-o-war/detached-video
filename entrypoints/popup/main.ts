@@ -11,6 +11,7 @@ const fieldset = form.querySelector<HTMLFieldSetElement>('fieldset')!;
 const radios = [...fieldset.querySelectorAll<HTMLInputElement>('input')];
 const videoRadio = fieldset.querySelector<HTMLInputElement>('[value="video"]')!;
 const submit = form.querySelector<HTMLButtonElement>('button')!;
+const override = form.querySelector<HTMLButtonElement>('#override')!;
 const refresh = document.querySelector<HTMLButtonElement>('#refresh')!;
 const embed = document.querySelector<HTMLButtonElement>('#embed')!;
 
@@ -20,14 +21,22 @@ let choices: MediaChoice[] = [];
 let lastScan = '';
 let busy = false;
 let updating = false;
+let offeredOverride: { mediaId: number; view: PlayerView } | undefined;
 
 function setStatus(text: string) {
   status.textContent = text;
   status.hidden = !text;
 }
 
+function clearOverride() {
+  if (offeredOverride) setStatus('');
+  offeredOverride = undefined;
+  override.hidden = true;
+}
+
 function updateSelection(keepView = false) {
   const choice = choices.find(item => item.id === Number(select.value));
+  if (choice?.id !== offeredOverride?.mediaId) clearOverride();
   if (!choice) return;
   title.textContent = choice.title;
   upNext.hidden = !choice.upNext;
@@ -72,6 +81,7 @@ async function readTab(id: number): Promise<MediaScan> {
 async function scan() {
   if (busy || updating) return;
   busy = true;
+  clearOverride();
   lastScan = '';
   setStatus('Looking for media…');
   form.hidden = refresh.hidden = embed.hidden = true;
@@ -105,6 +115,7 @@ const poll = window.setInterval(async () => {
 
 window.addEventListener('pagehide', () => window.clearInterval(poll), { once: true });
 select.addEventListener('change', () => updateSelection());
+fieldset.addEventListener('change', clearOverride);
 refresh.addEventListener('click', () => void scan());
 embed.addEventListener('click', async () => {
   if (!embedUrl || tabId === undefined) return;
@@ -120,14 +131,22 @@ form.addEventListener('submit', async event => {
   event.preventDefault();
   const view = radios.find(radio => radio.checked && !radio.disabled)?.value as PlayerView | undefined;
   if (busy || tabId === undefined || !select.value || !view) return;
+  const mediaId = Number(select.value);
+  const force = event.submitter === override;
+  if (force && (offeredOverride?.mediaId !== mediaId || offeredOverride.view !== view)) return;
+  clearOverride();
   busy = true;
   submit.disabled = refresh.disabled = select.disabled = fieldset.disabled = true;
   try {
-    const request: PlayerRequest = { detached: 'open', mediaId: Number(select.value), view };
+    const request: PlayerRequest = { detached: 'open', mediaId, view, overrideSiteOptOut: force };
     const result: OpenResult = await browser.tabs.sendMessage(tabId, request);
     if (result.status === 'error') {
       setStatus(result.message ?? 'Could not open the mini player.');
-      submit.textContent = 'Try again';
+      if (result.reason === 'site-opt-out') {
+        offeredOverride = { mediaId, view };
+        override.hidden = false;
+        override.focus();
+      } else submit.textContent = 'Try again';
     } else window.close();
   } catch {
     setStatus('The source page changed. Scan again to refresh the list.');
