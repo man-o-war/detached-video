@@ -2,22 +2,21 @@
 
 ## Chromium
 
-The extension uses native video Picture-in-Picture and Document
-Picture-in-Picture for audio controls. Both work with media exposed as HTML
-elements in the source tab, including accessible same-origin frames and open
-shadow roots. The floating audio window closes when the source document goes
-away. Desktop pinning and minimize behavior depend on the browser and OS.
+The extension uses native Picture-in-Picture for Video and Document
+Picture-in-Picture for Artwork and Compact. It works with HTML media in the
+source tab, including accessible same-origin frames and open shadow roots.
+The floating window closes when the source document goes away.
 
 - Verify both player types over a separate desktop app with the source window
   minimized. Start on macOS and extend coverage to Windows and Linux.
 - Verify Chrome, Edge, and Brave, recording versions and results.
-- Exercise YouTube, Dailymotion, and SoundCloud with the generic
-  implementation. Track embedded frames, track transitions, live streams, and
-  sites that expose no HTML media. Add adapters for reproduced gaps.
+- Verify the YouTube playlist and SoundCloud player bar adapters in a real
+  browser. Exercise Dailymotion to find gaps in generic media handling.
 - Add release assets and store listings after confirming the support matrix.
 
-Live browser playback, desktop layering, and named-site compatibility have yet
-to be verified.
+Native video playback on YouTube worked in a manual check of the first release.
+The v0.2 viewing modes, playlist adapter, and desktop layering still need a
+live browser check.
 
 ## Firefox
 

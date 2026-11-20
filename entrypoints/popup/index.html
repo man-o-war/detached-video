@@ -9,12 +9,26 @@
   </head>
   <body>
     <main>
-      <h1>Detached</h1>
+      <header><h1>Detached</h1></header>
       <p id="status" role="status">Looking for media…</p>
       <form hidden>
-        <label for="media">Media on this tab</label>
-        <select id="media" required></select>
-        <button type="submit">Open mini player</button>
+        <div class="track">
+          <p id="title"></p>
+          <p id="next" hidden></p>
+        </div>
+        <label id="media-picker" hidden>
+          Media on this tab
+          <select id="media" required></select>
+        </label>
+        <fieldset>
+          <legend>Player view</legend>
+          <div class="views">
+            <label><input type="radio" name="view" value="video"> <span>Video</span></label>
+            <label><input type="radio" name="view" value="artwork"> <span>Artwork</span></label>
+            <label><input type="radio" name="view" value="compact"> <span>Compact</span></label>
+          </div>
+        </fieldset>
+        <button type="submit">Open player</button>
       </form>
       <div class="actions">
         <button id="embed" type="button" hidden>Open embedded player in a tab</button>

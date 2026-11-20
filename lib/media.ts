@@ -1,13 +1,25 @@
 import type { MediaKind } from './messages';
+import { findSoundCloudPlayer, readSoundCloudTrack } from './soundcloud';
 
-export interface MediaCandidate {
+interface HtmlMediaCandidate {
+  source: 'html';
   element: HTMLMediaElement;
   kind: MediaKind;
   title: string;
   playing: boolean;
 }
 
-export function isAttached(element: HTMLMediaElement): boolean {
+interface SoundCloudCandidate {
+  source: 'soundcloud';
+  element: HTMLElement;
+  kind: 'audio';
+  title: string;
+  playing: boolean;
+}
+
+export type MediaCandidate = HtmlMediaCandidate | SoundCloudCandidate;
+
+export function isAttached(element: HTMLElement): boolean {
   if (!element.isConnected) return false;
   let doc = element.ownerDocument;
   while (doc !== document) {
@@ -18,8 +30,14 @@ export function isAttached(element: HTMLMediaElement): boolean {
   return true;
 }
 
-export function isPlayable(element: HTMLMediaElement): boolean {
+function isPlayable(element: HTMLMediaElement): boolean {
   return isAttached(element) && !element.error && element.readyState >= element.HAVE_METADATA;
+}
+
+export function isCandidatePlayable(candidate: MediaCandidate): boolean {
+  return candidate.source === 'html'
+    ? isPlayable(candidate.element)
+    : isAttached(candidate.element) && !!readSoundCloudTrack(candidate.element);
 }
 
 export function isPlaying(element: HTMLMediaElement): boolean {
@@ -47,7 +65,7 @@ export function scanPage(): { media: MediaCandidate[]; embedUrl?: string } {
           const kind = element.tagName === 'VIDEO' && (element as HTMLVideoElement).videoWidth > 0
             ? 'video'
             : 'audio';
-          media.push({ element, kind, title: mediaTitle(element, kind), playing: isPlaying(element) });
+          media.push({ source: 'html', element, kind, title: mediaTitle(element, kind), playing: isPlaying(element) });
         }
       } else if (node.tagName === 'IFRAME') {
         const frame = node as HTMLIFrameElement;
@@ -70,6 +88,13 @@ export function scanPage(): { media: MediaCandidate[]; embedUrl?: string } {
   }
 
   scan(document);
+  if (!media.some(candidate => candidate.kind === 'audio')) {
+    const player = findSoundCloudPlayer(document);
+    const track = player && readSoundCloudTrack(player);
+    if (track) {
+      media.unshift({ source: 'soundcloud', element: player, kind: 'audio', title: track.title, playing: track.playing });
+    }
+  }
   media.sort((a, b) => Number(b.playing) - Number(a.playing));
   return { media, embedUrl: embeds.size === 1 ? [...embeds][0] : undefined };
 }
