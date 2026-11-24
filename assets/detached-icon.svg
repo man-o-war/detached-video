@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96">
+  <!-- SPDX-License-Identifier: Apache-2.0 -->
+  <rect x="1" y="1" width="94" height="94" rx="21" fill="#252238" stroke="#aaa2c7" stroke-width="2"/>
+  <path d="M36 65H24a6 6 0 0 1-6-6V27a6 6 0 0 1 6-6h40a6 6 0 0 1 6 6v12"
+        fill="none" stroke="#bfb5ee" stroke-width="7" stroke-linecap="round"/>
+  <rect x="38" y="45" width="43" height="33" rx="7" fill="#f8f5ff"/>
+  <path d="M55 53.5 68 61.5 55 69.5Z" fill="#252238" stroke="#252238" stroke-width="2" stroke-linejoin="round"/>
+</svg>
